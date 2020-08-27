@@ -3,7 +3,7 @@ JiM Aug 2020
 
 Code to plot and process Nick's temp & dissolved oxygen files.
 
-There are two routines: one plot time series plots (plt_LFoM.py) and one to make a map (plt_LFoM_sites.py).
+There are two routines: one plot time series plots (plt_nicks.py) and one to make a map (plt_LFoM_sites.py).
 The first one creates a file "LFoM_sites.csv" which is read by the second.
 
 Assumes you have:
