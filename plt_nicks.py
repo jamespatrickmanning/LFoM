@@ -17,7 +17,7 @@ case=['Kurt_Holmes_HOUND_DOG_','Bill_Chaprales_RUEBY_','Bill_Lister_MUSSEL_POINT
 sn=[[2002042,2002043,2002044,2002045,2002046],[2006052,2006053,2006054,2006055,2006057],[2006066,2006067,2006068,2006069,2006072],[2006060,2006061,2006062,2006063,2006064],[2002047,2002048,2002049,2002050,2006051] ]
 # testT criteria for max temperature 
 testT=[19.0,19.0,20.0,22.0,19.0]
-mindistfromharbor=0.2 # minimum dist from harbor acceptable
+mindistfromharbor=.5# minimum dist from harbor acceptable
 #####  IMPORT modules
 import numpy as np
 import netCDF4
@@ -81,6 +81,7 @@ def gps_compare_JiM(lat,lon,mindistfromharbor): #check to see if the boat is in 
 ### MAIN CODE
 incp=0
 for f in range(len(case)):
+ #for f in [1]: # use this to test one case only    
  us=[i for i in range(len(case[f])) if case[f].startswith('_', i)]# gets index of underscores in "case" 
  fman=case[f][0:us[1]+1] # directory with csv & gps files
  if len(us)==5:
@@ -110,15 +111,15 @@ for f in range(len(case)):
                 else:
                     lat=np.nan
                     lon=np.nan
-            dfp.close()
         except:
             lat=np.nan
             lon=np.nan
+        dfp.close()
         if ~np.isnan(lat):
-            [la,lo]=dd2dm(lat,lon)# converts to ddmm format change indexes 4/9/2019    
+            [la,lo]=dd2dm(lat,lon)# converts to ddmm format change indexes 4/9/2019  
             yorn=gps_compare_JiM(la,lo,mindistfromharbor) # check to see if the data is from the dock (near harbor)
-            if yorn=='y':
-                    continue   
+            if yorn=='yes':
+                continue   
         incf=0 #increment through files with this sn
         print(os.path.join(direct, file))
         fn=os.path.join(direct, file)
