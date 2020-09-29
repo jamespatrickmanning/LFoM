@@ -12,19 +12,28 @@ First application Cape Cod Bay 2020
 testO=0.3# criteria to first difference test Oxygen in water
 
 
-inputdir='C:/Users/DELL/Downloads/lfa_dmf/'
+inputdir='C:/Users/Joann/Downloads/lfm_dmf/'
+#inputdir='C:/Users/DELL/Downloads/lfa_dmf/'
 case=['Kurt_Holmes_HOUND_DOG_','Bill_Chaprales_RUEBY_','Bill_Lister_MUSSEL_POINT_','Mike_Rego_MISS_LILLY_','Willy_Ogg_Jr_HAPPY_TRAILS_']
 sn=[[2002042,2002043,2002044,2002045,2002046],[2006052,2006053,2006054,2006055,2006057],[2006066,2006067,2006068,2006069,2006072],[2006060,2006061,2006062,2006063,2006064],[2002047,2002048,2002049,2002050,2006051] ]
 # testT criteria for max temperature 
 testT=[19.0,19.0,20.0,22.0,19.0]
 mindistfromharbor=.5# minimum dist from harbor acceptable
+Host = '66.114.154.52' # ISOMEDIA machine where emolt.org is
+UserName = 'mingchaossh'
+Pswd = 'eMOLT1$'
+remot_dir = '/httpdocs'
+local_folder = ''
 #####  IMPORT modules
 import numpy as np
 import netCDF4
 import pandas as pd
 import matplotlib.pyplot as plt
+import ftplib
 import os
-#from conversions import dd2dm
+import warnings
+warnings.filterwarnings('ignore')
+import multiple_models as mm
 
 ###  FUNCTIONS
 def dd2dm(lat,lon):
@@ -78,10 +87,22 @@ def gps_compare_JiM(lat,lon,mindistfromharbor): #check to see if the boat is in 
     else:
        near_harbor='no'
     return near_harbor #yes or no
+def upload_emolt(Host, UserName, Pswd,remot_dir, local_folder):
+    '''upload result to cloud'''
+    ftp = ftplib.FTP(Host)
+    ftp.login(UserName, Pswd)
+    ftp.cwd(remot_dir)
+    command = 'STOR emolt_nicks.csv'
+    sendFILEName = 'emolt_nicks.csv'
+    ftp.storbinary(command, open(sendFILEName,'rb'))
+    print('uploading csv to emolt.org ')
+    ftp.quit()
 ### MAIN CODE
+if os.path.exists('emolt_nicks.csv'):
+    os.remove('emolt_nicks.csv')
 incp=0
 for f in range(len(case)):
- #for f in [1]: # use this to test one case only    
+#for f in [1]: # use this to test one case only    
  us=[i for i in range(len(case[f])) if case[f].startswith('_', i)]# gets index of underscores in "case" 
  fman=case[f][0:us[1]+1] # directory with csv & gps files
  if len(us)==5:
@@ -150,17 +171,53 @@ for f in range(len(case)):
         else:
             dfp2out = pd.DataFrame([[fman,k,df['lat'].mean(),df['lon'].mean()]], columns=['fman','sn','lat','lon'])
             dfpout=pd.concat([dfpout, dfp2out])# saves all the position data
+  # here's where we save an "emolt.dat" -like file which includes:
+  # vessel_# sn mth day hr mn yd lon lat 1.0 nan depth range_depth days temp std_temp year
+  #'''
+  dfall['mth']=0
+  dfall['day']=0
+  dfall['yrday']=0.0#initializes as float  
+  #dfall['doppio']=[]#model estimate
+  for jj in range(len(dfall)):
+      dfall['mth'][jj]=dfall.index.month[jj].astype(np.int64)
+      dfall['day'][jj]=dfall.index.day[jj].astype(np.int64)
+      #dfall['doppio'].append(mm.get_doppio_no_fitting(lat=dfall['lat'][jj],lon=dfall['lon'][jj],depth=99999,time=dfall.index[jj]))
+      #dfall['yrday'][jj]=dfall.index[jj].timetuple().tm_yday+(dfall['hour'][jj]+dfall['min'][jj]/60.)/24.
+      dfall['yrday'][jj]=dfall.index[jj].timetuple().tm_yday+(dfall.index[jj].hour+dfall.index[jj].minute/60.)/24.
+  #dfall['days']=(dfall.index.max()-dfall.index.min()).days 
+  dfall['std_temp']=dfall['Temperature (C)'].std()
+
+  dfallda=dfall.resample('D').mean()
+  dfallda['vessel_num']=50+f
+  dfallda['serial_num']=k
+  dfallda['hour']=[12]*len(dfallda)
+  dfallda['min']=[0]*len(dfallda)
+  #dfallda['yrday']=[0]*len(dfallda)
+  dfallda['days']=[1.0]*len(dfallda)
+  dfallda['year']=dfallda.index.year 
+  dfallda['dum1']=[0]*len(dfallda)
+  #depth=get_depth(dfallda['lon'],dfallda['lat'],0.4)
+  try:
+      depth=get_depth(dfall['lon'].mean(skipna=True),dfall['lat'].mean(skipna=True),0.4)
+  except:
+      depth=np.nan
+  dfallda['depth']=[depth]*len(dfallda)
+  dfallda['range_depth']=[0]*len(dfallda)
+  use_col=['vessel_num','serial_num', 'mth', 'day', 'hour', 'min', 'yrday','lon','lat','Dissolved Oxygen (mg/l)','dum1','depth', 'range_depth', 'days', 'Temperature (C)','std_temp', 'year']
+  dfallda.to_csv('emolt_nicks.csv',sep=' ',columns=use_col,header=False,mode='a',index=False,float_format='%.3f')  
+  #dfallda[[use_col]].to_csv('emolt_nicks.csv',sep=' ',header=False,mode='a',index=False,float_format='%.3f')  
+  #'''    
   ax=dfall[['Dissolved Oxygen (mg/l)','Temperature (C)']].plot(subplots=True) # plots both columns
   FT=dfall['Temperature (C)'].values*1.8+32
   ax2=ax[1].twinx()
   ax2.set_ylim(ax[1].get_ylim()[0]*1.8+32,ax[1].get_ylim()[1]*1.8+32)
   ax2.plot(dfall.index,FT,color='r')
   ax2.set_ylabel('fahrenheit')
-  depth=get_depth(dfall['lon'].mean(skipna=True),dfall['lat'].mean(skipna=True),0.4)
   #ax[0].set_title(fman+' SN='+str(k)+' @ '+"{0:.4g}".format(dfall['lat'].mean(skipna=True))+'N '+"{0:.4g}".format(dfall['lon'].mean(skipna=True))+'W', fontsize=12)
   ax[0].set_title(fman+' SN='+str(k)+' @ ~'+"{0:.4g}".format(dfall['lat'].mean(skipna=True))+'N '+"{0:.4g}".format(dfall['lon'].mean(skipna=True))+'W in ~'+"{0:.2g}".format(abs(depth))+'meters', fontsize=12)
   plt.savefig(str(k)+'_'+fman+'_time_series_plot_raw.png')
  plt.show()
  plt.close('all')
 dfpout.to_csv('LFoM_sites.csv')
+#upload_emolt(Host, UserName, Pswd,remot_dir, local_folder)
 
