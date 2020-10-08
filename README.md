@@ -8,10 +8,12 @@ The first one creates a file "LFoM_sites.csv" which is read by the second.
 
 Assumes you have:
 
--the .csv and .gps files in same directory
+-the .csv  files in same directory
 
 -installed Python with netCDF4 module to get NGDC depths
 
 -have all the docks included in the "harborlist.txt" file
 
 -examined the editting criteria like "testT", for example,  which filters out temp > that value
+
+Note: Prior to Oct 2020, I was reading the "gps" files along with the csv file but then Nick allowed us to read both in the csv files.
