@@ -4,11 +4,10 @@ Created on Fri Aug 21 14:22:41 2020
 
 @author: JiM
 Processing Nick's probe data with DO included
-First application Cape Cod Bay 2020 (old version in plt_nicks_preOct2020.py)
-Modified in October 2020 to read Nick's new format
+First application Cape Cod Bay 2020
 """
 #####  HARDCODES 
-#fn=direct+'2002042_low_20200716_050955_DissolvedOxygen_GPS.csv'
+#fn=direct+'2002042_low_20200716_050955_DissolvedOxygen.csv'
 #fnp=direct+'2002042_low_20200716_050955.gps'
 testO=0.3# criteria to first difference test Oxygen in water
 
@@ -102,14 +101,14 @@ def upload_emolt(Host, UserName, Pswd,remot_dir, local_folder):
     print('uploading csv to emolt.org ')
     ftp.quit()
 ### MAIN CODE
-if os.path.exists('emolt_nicks.csv'): # refresh the daily average output file
+if os.path.exists('emolt_nicks.csv'):
     os.remove('emolt_nicks.csv')
 incp=0
-for f in range(len(case)):
-#for f in [1]: # use this to test one case only    
+#for f in range(len(case)):
+for f in [1]: # use this to test one case only    
  us=[i for i in range(len(case[f])) if case[f].startswith('_', i)]# gets index of underscores in "case" 
- fman=case[f][0:us[1]+1] # directory with csv  files has fishers name
- if len(us)==5: # Accounts for names like "willy_Ogg_Jr" having multiple parts
+ fman=case[f][0:us[1]+1] # directory with csv & gps files
+ if len(us)==5:
     vessel=case[f][us[0]+1:us[2]]
  else:
     vessel=case[f][us[0]+1:us[1]]
@@ -119,8 +118,7 @@ for f in range(len(case)):
   direct=inputdir+case[f]+str(k)
   inc=0 #increments through sn
   for file in os.listdir(direct):
-    if (file.startswith(str(k))) and (file.endswith("DissolvedOxygen_GPS.csv")):
-        '''
+    if (file.startswith(str(k))) and (file.endswith("DissolvedOxygen.csv")):
         fnp=os.path.join(direct, file[0:27])+'.gps'
         try:
             dfp=open(fnp)
@@ -147,17 +145,13 @@ for f in range(len(case)):
             yorn=gps_compare_JiM(la,lo,mindistfromharbor) # check to see if the data is from the dock (near harbor)
             if yorn=='yes':
                 continue   
-        '''
         incf=0 #increment through files with this sn
         print(os.path.join(direct, file))
         fn=os.path.join(direct, file)
         ##### READ & PLOT
         df=pd.read_csv(fn)# gets raw probe data
-        #df=df.drop('Dissolved Oxygen (%)',axis=1)# drop this since Nick says it is no good
-        df=df.rename(columns={'TEMP':'Temperature (C)'}) # rename column
-        df=df.rename(columns={'DO':'Dissolved Oxygen (mg/l)'})
-        df=df.rename(columns={'S_lat':'lat'}) # rename column
-        df=df.rename(columns={'S_long':'lon'})
+        df=df.drop('Dissolved Oxygen (%)',axis=1)# drop this since Nick says it is no good
+        df=df.rename(columns={'DO Temperature (C)':'Temperature (C)'}) # rename column
         df['date']=pd.to_datetime(df['ISO 8601 Time'], format='%Y-%m-%dT%H:%M:%S') # form a datetime
         df=df.set_index('date') # make this the "index" column of the dataframe
         diffO=df['Dissolved Oxygen (mg/l)'].diff()# first differences of Oxygen
@@ -168,8 +162,8 @@ for f in range(len(case)):
             df=df[id[-1][-1]+1:-1]
         df=df[df['Temperature (C)']<testT[f]] # remove data greater than "testT"   
         inc=inc+1
-        #df['lat']=lat
-        #df['lon']=lon        
+        df['lat']=lat
+        df['lon']=lon        
 
         if inc==1: #increment through sn 
             dfall=df
@@ -184,6 +178,7 @@ for f in range(len(case)):
   # here's where we save an "emolt.dat" -like file which includes:
   # vessel_# sn mth day hr mn yd lon lat 1.0 nan depth range_depth days temp std_temp year
   #'''
+  dfall=pd.DataFrame()
   dfall['mth']=0
   dfall['day']=0
   dfall['yrday']=0.0#initializes as float  
@@ -230,5 +225,5 @@ for f in range(len(case)):
  plt.show()
  plt.close('all')
 dfpout.to_csv('LFoM_sites.csv')
-upload_emolt(Host, UserName, Pswd,remot_dir, local_folder)
+#upload_emolt(Host, UserName, Pswd,remot_dir, local_folder)
 
