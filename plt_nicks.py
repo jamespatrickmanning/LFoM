@@ -96,17 +96,17 @@ def upload_emolt(Host, UserName, Pswd,remot_dir, local_folder):
     ftp = ftplib.FTP(Host)
     ftp.login(UserName, Pswd)
     ftp.cwd(remot_dir)
-    command = 'STOR emolt_nicks.csv'
-    sendFILEName = 'emolt_nicks.csv'
+    command = 'STOR emolt_nicks.dat'
+    sendFILEName = 'emolt_nicks.dat'
     ftp.storbinary(command, open(sendFILEName,'rb'))
-    print('uploading csv to emolt.org ')
+    print('uploading emolt_nicks.dat to emolt.org ')
     ftp.quit()
 ### MAIN CODE
 if os.path.exists('emolt_nicks.csv'): # refresh the daily average output file
     os.remove('emolt_nicks.csv')
 incp=0
 for f in range(len(case)):
-#for f in [1]: # use this to test one case only    
+#for f in [0,1]: # use this to test one case only    
  us=[i for i in range(len(case[f])) if case[f].startswith('_', i)]# gets index of underscores in "case" 
  fman=case[f][0:us[1]+1] # directory with csv  files has fishers name
  if len(us)==5: # Accounts for names like "willy_Ogg_Jr" having multiple parts
@@ -120,34 +120,6 @@ for f in range(len(case)):
   inc=0 #increments through sn
   for file in os.listdir(direct):
     if (file.startswith(str(k))) and (file.endswith("DissolvedOxygen_GPS.csv")):
-        '''
-        fnp=os.path.join(direct, file[0:27])+'.gps'
-        try:
-            dfp=open(fnp)
-            line=dfp.readline()
-            if (line[0:3]=='RWS') & (line[5]=='4'):
-                lat=float(line[5:14])
-                lon=float(line[14:24])
-            else:
-                line=dfp.readline()
-                line=dfp.readline()
-                line=dfp.readline()
-                if (line[0:3]=='SWS') & (line[5]=='4'):
-                    lat=float(line[5:14])
-                    lon=float(line[14:24])
-                else:
-                    lat=np.nan
-                    lon=np.nan
-        except:
-            lat=np.nan
-            lon=np.nan
-        dfp.close()
-        if ~np.isnan(lat):
-            [la,lo]=dd2dm(lat,lon)# converts to ddmm format change indexes 4/9/2019  
-            yorn=gps_compare_JiM(la,lo,mindistfromharbor) # check to see if the data is from the dock (near harbor)
-            if yorn=='yes':
-                continue   
-        '''
         incf=0 #increment through files with this sn
         print(os.path.join(direct, file))
         fn=os.path.join(direct, file)
@@ -158,6 +130,17 @@ for f in range(len(case)):
         df=df.rename(columns={'DO':'Dissolved Oxygen (mg/l)'})
         df=df.rename(columns={'S_lat':'lat'}) # rename column
         df=df.rename(columns={'S_long':'lon'})
+        for kk in range(len(df)):
+            if np.isnan(df['lat'][kk]):
+                df['lat'][kk]=df['E_lat'][kk]
+                df['lon'][kk]=df['E_long'][kk]
+        if ~np.isnan(df['lat'][0]):
+            [la,lo]=dd2dm(df['lat'][0],df['lon'][0])# converts to ddmm format change indexes 4/9/2019  
+            yorn=gps_compare_JiM(la,lo,mindistfromharbor) # check to see if the data is from the dock (near harbor)
+            if yorn=='yes':
+                continue  
+        if np.isnan(df['lat'][0]):
+            continue
         df['date']=pd.to_datetime(df['ISO 8601 Time'], format='%Y-%m-%dT%H:%M:%S') # form a datetime
         df=df.set_index('date') # make this the "index" column of the dataframe
         diffO=df['Dissolved Oxygen (mg/l)'].diff()# first differences of Oxygen
@@ -168,10 +151,9 @@ for f in range(len(case)):
             df=df[id[-1][-1]+1:-1]
         df=df[df['Temperature (C)']<testT[f]] # remove data greater than "testT"   
         inc=inc+1
-        #df['lat']=lat
-        #df['lon']=lon        
-
-        if inc==1: #increment through sn 
+        df=df[df['lat']!=np.nan]
+        #if (f==0) & (inc==1): #first case and first serial number 
+        if inc==1: # first case of this serial number 
             dfall=df
         else:
             dfall= pd.concat([dfall, df], axis=0) # adds to whole dataframe for this participant
@@ -191,10 +173,7 @@ for f in range(len(case)):
   for jj in range(len(dfall)):
       dfall['mth'][jj]=dfall.index.month[jj].astype(np.int64)
       dfall['day'][jj]=dfall.index.day[jj].astype(np.int64)
-      #dfall['doppio'].append(mm.get_doppio_no_fitting(lat=dfall['lat'][jj],lon=dfall['lon'][jj],depth=99999,time=dfall.index[jj]))
-      #dfall['yrday'][jj]=dfall.index[jj].timetuple().tm_yday+(dfall['hour'][jj]+dfall['min'][jj]/60.)/24.
       dfall['yrday'][jj]=dfall.index[jj].timetuple().tm_yday+(dfall.index[jj].hour+dfall.index[jj].minute/60.)/24.
-  #dfall['days']=(dfall.index.max()-dfall.index.min()).days 
   dfall['std_temp']=dfall['Temperature (C)'].std()
 
   dfallda=dfall.resample('D').mean()
@@ -202,7 +181,6 @@ for f in range(len(case)):
   dfallda['serial_num']=k
   dfallda['hour']=[12]*len(dfallda)
   dfallda['min']=[0]*len(dfallda)
-  #dfallda['yrday']=[0]*len(dfallda)
   dfallda['days']=[1.0]*len(dfallda)
   dfallda['year']=dfallda.index.year 
   dfallda['dum1']=[0]*len(dfallda)
@@ -214,7 +192,9 @@ for f in range(len(case)):
   dfallda['depth']=[depth]*len(dfallda)
   dfallda['range_depth']=[0]*len(dfallda)
   use_col=['vessel_num','serial_num', 'mth', 'day', 'hour', 'min', 'yrday','lon','lat','Dissolved Oxygen (mg/l)','dum1','depth', 'range_depth', 'days', 'Temperature (C)','std_temp', 'year']
-  dfallda.to_csv('emolt_nicks.csv',sep=' ',columns=use_col,header=False,mode='a',index=False,float_format='%.3f')  
+  #dfallda=dfallda[dfallda['lat']!=np.nan]
+  dfallda=dfallda.dropna(axis=0,subset=['lat'])
+  dfallda.to_csv('emolt_nicks.dat',sep=' ',columns=use_col,header=False,mode='a',index=False,float_format='%.3f')  
   #dfallda[[use_col]].to_csv('emolt_nicks.csv',sep=' ',header=False,mode='a',index=False,float_format='%.3f')  
   #'''    
   ax=dfall[['Dissolved Oxygen (mg/l)','Temperature (C)']].plot(subplots=True) # plots both columns
@@ -230,5 +210,5 @@ for f in range(len(case)):
  plt.show()
  plt.close('all')
 dfpout.to_csv('LFoM_sites.csv')
-upload_emolt(Host, UserName, Pswd,remot_dir, local_folder)
+#upload_emolt(Host, UserName, Pswd,remot_dir, local_folder)
 
